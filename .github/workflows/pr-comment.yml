@@ -47,9 +47,23 @@ jobs:
               return;
             }
 
-            const getResult = async() => {
-              const resp = await fetch(url);
-              const data = await resp.json();
+            const response = await fetch(url, {
+              method: "GET",
+              headers: {
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+              }
+            });
+
+            if(!response.ok){
+              core.setFailed(`API Faild: ${response.status} ${response.statusText}`);
+              return;
+            }
+
+            let data = {};
+            try {
+              data = await response.json();
+            } catch (e) {
+              core.warning(`JSON 파싱 실패: ${e.message}`);
             }
 
             const comment = `
