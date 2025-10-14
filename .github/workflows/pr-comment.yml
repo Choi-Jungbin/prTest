@@ -20,6 +20,7 @@ jobs:
     
     permissions:
       pull-requests: write
+      contents: read
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -59,8 +60,8 @@ jobs:
 
             if (exist){
               core.info("코멘트를 업데이트합니다...");
-              github.rest.issues.updateComment({
-                comment_id: existing.id,
+              await github.rest.issues.updateComment({
+                comment_id: exist.id,
                 owner: owner,
                 repo: repo,
                 body: comment,
@@ -68,7 +69,7 @@ jobs:
             }
             else {
               core.info("코멘트를 생성합니다...");
-              github.rest.issues.createComment({
+              await github.rest.issues.createComment({
                 issue_number: prNumber,
                 owner: owner,
                 repo: repo,
