@@ -35,7 +35,8 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            const prNumber = context.payload.pull_request.number;
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
             const repo = context.repo.repo;
             const owner = context.repo.owner;
 
@@ -115,9 +116,9 @@ jobs:
             ### 자동 pr 코멘트 테스트!
             이것은 자동 pr 코멘트 테스트입니다
             
-            - PR 제목: ${context.payload.pull_request.title}
-            - 브랜치: ${context.payload.pull_request.head.ref} → ${context.payload.pull_request.base.ref}
-            - 작성자: @${context.payload.pull_request.user.login}
+            - PR 제목: ${pr.title}
+            - 브랜치: ${pr.head.ref} → ${pr.base.ref}
+            - 작성자: @${pr.user.login}
             - 시간: ${data.time}
             `;
 
