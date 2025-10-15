@@ -43,6 +43,9 @@ jobs:
             const url = process.env.API_URL;
             const token = process.env.API_TOKEN;
 
+            const headSha = pr.head.sha;
+            const baseSha = pr.base.sha;
+
             if(!url){
               core.setFailed("api url이 없어욥");
               return;
