@@ -54,16 +54,87 @@ jobs:
               { owner, repo, pull_number: prNumber, per_page: 100 }
             );
 
-            const changedFiles = files.map(f => ({
-              filename: f.filename,
-              status: f.status,           // added|modified|removed|renamed
-              additions: f.additions,
-              deletions: f.deletions,
-              changes: f.changes,
-              sha: f.sha,
-              previous_filename: f.previous_filename || null,
-              // GitHub가 주는 patch(해당 파일의 unified diff 일부/전체). 없을 수도 있습니다.
-              patch: typeof f.patch === "string" ? f.patch : null
+            # const changedFiles = files.map(f => ({
+            #   filename: f.filename,
+            #   status: f.status,           // added|modified|removed|renamed
+            #   additions: f.additions,
+            #   deletions: f.deletions,
+            #   changes: f.changes,
+            #   sha: f.sha,
+            #   previous_filename: f.previous_filename || null,
+            #   // GitHub가 주는 patch(해당 파일의 unified diff 일부/전체). 없을 수도 있습니다.
+            #   patch: typeof f.patch === "string" ? f.patch : null
+            # }));
+
+            // 파일 본문을 base64로 가져오는 헬퍼
+            async function getFileContentB64(ref, path) {
+              try {
+                // 우선 contents API 시도 (작은 파일에 유리)
+                const { data } = await github.rest.repos.getContent({
+                  owner, repo, path, ref,
+                  headers: { Accept: "application/vnd.github.v3+json" }
+                });
+      
+                // 디렉터리인 경우 skip
+                if (Array.isArray(data) || data.type !== "file") {
+                  return { ok: false, reason: "not-a-file" };
+                }
+      
+                // 큰 파일이면 content가 없거나 truncate 될 수 있음 -> blob로 재시도
+                if (!data.content || data.encoding !== "base64") {
+                  // data.sha는 그 파일 blob sha
+                  const blob = await github.rest.git.getBlob({ owner, repo, file_sha: data.sha });
+                  return { ok: true, content_b64: blob.data.content, size: blob.data.size, sha: data.sha, from: "blob" };
+                }
+      
+                // 정상 (<=1MB)
+                return { ok: true, content_b64: data.content, size: data.size, sha: data.sha, from: "contents" };
+              } catch (e) {
+                // contents 실패 시 blob로 직접 시도 (경로->트리 경유는 비싸므로 여기선 생략)
+                // 주로 파일이 매우 커서 contents가 실패한 케이스 처리
+                core.info(`getContent 실패 ref=${ref} path=${path}: ${e.message}`);
+                return { ok: false, reason: e.message };
+              }
+            }
+      
+            // 상태별로 필요한 ref/path 수집
+            const tasks = [];
+            for (const f of files) {
+              const baseInfo = { ref: baseSha, path: f.previous_filename || f.filename };
+              const headInfo = { ref: headSha, path: f.filename };
+      
+              if (f.status === "added" || f.status === "modified") {
+                tasks.push({ kind: "current", ...headInfo, meta: f });
+              } else if (f.status === "removed") {
+                tasks.push({ kind: "previous", ...baseInfo, meta: f });
+              } else if (f.status === "renamed") {
+                // 둘 다 보내고 싶다면 둘 다 push
+                tasks.push({ kind: "previous", ...baseInfo, meta: f });
+                tasks.push({ kind: "current",  ...headInfo, meta: f });
+              } else {
+                // changed/copied 등 희귀 상태도 대비
+                tasks.push({ kind: "current", ...headInfo, meta: f });
+              }
+            }
+      
+            // 병렬로 가져오기(속도 ↑). 너무 크면 rate-limit 고려해 배치 처리 가능.
+            const results = await Promise.all(tasks.map(async (t) => {
+              const r = await getFileContentB64(t.ref, t.path);
+              return {
+                ok: r.ok,
+                reason: r.reason,
+                kind: t.kind,                 // current/previous
+                path: t.path,
+                ref: t.ref,
+                sha: r.sha ?? t.meta.sha,
+                size: r.size ?? t.meta.changes, // size 정보 없으면 대충 변경 라인수라도
+                status: t.meta.status,
+                previous_filename: t.meta.previous_filename || null,
+                additions: t.meta.additions,
+                deletions: t.meta.deletions,
+                content_b64: r.ok ? r.content_b64 : null,
+                source: r.from ?? "unknown"
+              };
             }));
 
             const payload = {
@@ -75,8 +146,13 @@ jobs:
                 head: { ref: pr.head.ref, sha: pr.head.sha },
                 base: { ref: pr.base.ref, sha: pr.base.sha },
                 author: pr.user.login,
+                counts: {
+                  files: files.length,
+                  additions: files.reduce((s,f)=>s+f.additions,0),
+                  deletions: files.reduce((s,f)=>s+f.deletions,0),
+                }
               },
-              files: changedFiles
+              files: results
             };
 
             const response = await fetch(url, {
