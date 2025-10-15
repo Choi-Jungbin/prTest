@@ -74,6 +74,7 @@ jobs:
               }
             );
             const fullDiff = diffRes.data; // string (대용량 가능)
+            core.info("변경 부분 수집 완료!");
 
             const payload = {
               meta: {
