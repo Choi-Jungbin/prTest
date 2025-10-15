@@ -47,11 +47,54 @@ jobs:
               return;
             }
 
-            const response = await fetch(url, {
-              method: "GET",
-              headers: {
-                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            // 변경 부분만 수집
+            # const files = await github.paginate(
+            #   github.rest.pulls.listFiles,
+            #   { owner, repo, pull_number: prNumber, per_page: 100 }
+            # );
+
+            # const changedFiles = files.map(f => ({
+            #   filename: f.filename,
+            #   status: f.status,           // added|modified|removed|renamed
+            #   additions: f.additions,
+            #   deletions: f.deletions,
+            #   changes: f.changes,
+            #   sha: f.sha,
+            #   previous_filename: f.previous_filename || null,
+            #   // GitHub가 주는 patch(해당 파일의 unified diff 일부/전체). 없을 수도 있습니다.
+            #   patch: typeof f.patch === "string" ? f.patch : null
+            # }));
+
+            // 변경된 부분의 원문 수집
+            const diffRes = await github.request(
+              "GET /repos/{owner}/{repo}/pulls/{pull_number}",
+              {
+                owner, repo, pull_number: prNumber,
+                headers: { Accept: "application/vnd.github.v3.diff" }
               }
+            );
+            const fullDiff = diffRes.data; // string (대용량 가능)
+
+            const payload = {
+              meta: {
+                owner,
+                repo,
+                prNumber,
+                title: pr.title,
+                head: { ref: pr.head.ref, sha: pr.head.sha },
+                base: { ref: pr.base.ref, sha: pr.base.sha },
+                author: pr.user.login,
+              },
+              files: fullDiff
+            };
+
+            const response = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify(payload)
             });
 
             if(!response.ok){
