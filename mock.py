@@ -59,4 +59,4 @@ for i in range(N):
             explore(arr, visited_c, i, j, True)
             abnorm_cnt += 1
 print(norm_cnt, abnorm_cnt)
-print("진짜 되나?")
+print("가보자~~~~~")
