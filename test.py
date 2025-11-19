@@ -1,3 +1,3 @@
 a = []
-a.append(10)
+a.append(20)
 print(a)
