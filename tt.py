@@ -31,4 +31,3 @@ def calc_result(num):
 
 answer = calc_result(num)
 print(answer)
-print("hello")
