@@ -26,9 +26,9 @@ def calc_result(num):
         return "Buzz"
     if not con_3 and not con_5:
         return num
-
     return num
 
 
 answer = calc_result(num)
 print(answer)
+print("success!")
