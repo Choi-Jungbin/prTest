@@ -1,62 +1,24 @@
 import sys
-from collections import deque
 
 input = sys.stdin.readline
 
-N = int(input())
-arr = [list(input().strip()) for _ in range(N)]
+W, H, f, c, x1, y1, x2, y2 = map(int, input().split())
 
-visited = [[False] * N for _ in range(N)]
-visited_c = [[False] * N for _ in range(N)]
+answer = W * H
 
-directions = ((1, 0), (-1, 0), (0, 1), (0, -1))
+if W - f < f:
+    remain = W - f
+else:
+    remain = f
 
+if x2 < remain:
+    line = (x2 - x1) * 2
+elif remain <= x1:
+    line = x2 - x1
+else:
+    line = (remain - x1) * 2
+    line += x2 - remain
 
-def is_valid_range(r, c):
-    return 0 <= r and r < N and 0 <= c and c < N
-
-
-def explore(arr, visited, r, c, ignore_color: bool = False):
-    stk = deque()
-    stk.append([r, c])
-
-    while stk:
-        r, c = stk.popleft()
-
-        if visited[r][c]:
-            continue
-
-        visited[r][c] = True
-
-        for dr, dc in directions:
-            nr, nc = r + dr, c + dc
-
-            if not is_valid_range(nr, nc):
-                continue
-
-            if visited[nr][nc]:
-                continue
-
-            if arr[r][c] != arr[nr][nc]:
-                if ignore_color and (
-                    (arr[r][c] == "R" or arr[r][c] == "G")
-                    and (arr[nr][nc] == "R" or arr[nr][nc] == "G")
-                ):
-                    pass
-                else:
-                    continue
-            stk.append([nr, nc])
-
-
-norm_cnt = 0
-abnorm_cnt = 0
-for i in range(N):
-    for j in range(N):
-        if not visited[i][j]:
-            explore(arr, visited, i, j, False)
-            norm_cnt += 1
-        if not visited_c[i][j]:
-            explore(arr, visited_c, i, j, True)
-            abnorm_cnt += 1
-print(norm_cnt, abnorm_cnt)
-print("가보자~~~~~")
+block = line * (y2 - y1)
+answer -= block * (c + 1)
+print(answer)
